@@ -164,12 +164,11 @@ object BetterPartyFinder : Module(
                     val kickedReasons = mutableListOf<String>()
 
                     val currentProfile = profile.getOrElse { err ->
-                        if (apiFailKick) {
+                        if (apiFailKick && !clazz.equals("Mage", ignoreCase = true)) {
                             if (informKicked) {
                                 schedule(6) { if (name !in leftPlayers) sendCommand("party kick $name") }
                                 sendCommand("pc Kicked $name: couldn't verify (API error)")
                             } else sendCommand("party kick $name")
-                            if (kickCache) kickedList.add(name)
                             return@launch modMessage("Kicking $name (API error: ${err.message})")
                         }
                         return@launch modMessage(err.message)

@@ -2,19 +2,15 @@ package com.odtheking.odin.utils.skyblock.dungeon
 
 import com.odtheking.odin.OdinMod.mc
 import com.odtheking.odin.OdinMod.scope
-import com.odtheking.odin.events.ChatPacketEvent
-import com.odtheking.odin.events.RoomEnterEvent
-import com.odtheking.odin.events.TickEvent
-import com.odtheking.odin.events.LevelEvent
-import com.odtheking.odin.events.core.EventPriority
+import com.odtheking.odin.events.*
 import com.odtheking.odin.events.core.on
 import com.odtheking.odin.events.core.onReceive
 import com.odtheking.odin.features.impl.dungeon.LeapMenu
 import com.odtheking.odin.features.impl.dungeon.LeapMenu.odinSorting
+import com.odtheking.odin.features.impl.dungeon.map.DungeonScan
 import com.odtheking.odin.utils.network.WebUtils.hasBonusPaulScore
 import com.odtheking.odin.utils.noControlCodes
 import com.odtheking.odin.utils.romanToInt
-import com.odtheking.odin.utils.skyblock.dungeon.tiles.Room
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import net.minecraft.network.protocol.game.*
@@ -28,8 +24,6 @@ object DungeonListener {
     var dungeonTeammatesNoSelf: List<DungeonPlayer> = ArrayList(4)
     var leapTeammates: List<DungeonPlayer> = ArrayList(4)
 
-    inline val passedRooms: MutableSet<Room> get() = ScanUtils.passedRooms
-    inline val currentRoom: Room? get() = ScanUtils.currentRoom
     private var expectingBloodUpdate = false
     var dungeonStats = DungeonStats()
     var puzzles = ArrayList<Puzzle>()
@@ -66,9 +60,8 @@ object DungeonListener {
             paul = false
         }
 
-        on<RoomEnterEvent> (EventPriority.HIGH) {
-            val room = room?.takeUnless { room -> passedRooms.any { it.data.name == room.data.name } } ?: return@on
-            dungeonStats.knownSecrets += room.data.secrets
+        on<RoomEnterEvent> {
+            dungeonStats.knownSecrets = DungeonScan.rooms.sumOf { if (it.walkedInto) it.data?.secrets ?: 0 else 0 }
         }
 
         onReceive<ClientboundPlayerInfoUpdatePacket> {
@@ -82,8 +75,12 @@ object DungeonListener {
             val text = parameters.getOrNull()?.let { it.playerPrefix.string.plus(it.playerSuffix.string).noControlCodes } ?: return@onReceive
 
             floorRegex.find(text)?.groupValues?.get(1)?.let {
-                if (floor == null) scope.launch(Dispatchers.IO) { paul = hasBonusPaulScore() }
-                floor = Floor.valueOf(it)
+                if (floor == null) {
+                    scope.launch(Dispatchers.IO) { paul = hasBonusPaulScore() }
+                    val detectedFloor = Floor.valueOf(it)
+                    floor = detectedFloor
+                    FloorEnterEvent(detectedFloor).postAndCatch()
+                }
             }
 
             clearedRegex.find(text)?.groupValues?.get(1)?.toIntOrNull()?.let {
@@ -113,6 +110,9 @@ object DungeonListener {
 
                 "prince killed", "prince slain", "prince killed!", "prince dead", "prince dead!", ->
                     dungeonStats.princeKilled = true
+
+                "bat killed", "bat slain", "bat killed!", "bat dead", "bat dead!" ->
+                    dungeonStats.batKilled = true
 
                 "blaze done!", "blaze done", "blaze puzzle solved!" ->
                     puzzles.find { it == Puzzle.BLAZE }.let { it?.status = PuzzleStatus.Completed }
@@ -206,6 +206,7 @@ object DungeonListener {
         var elapsedTime: String = "0s",
         private var _mimicKilled: Boolean = false,
         var princeKilled: Boolean = false,
+        var batKilled: Boolean = false,
         var doorOpener: String = "Unknown",
         var bloodDone: Boolean = false,
         var puzzleCount: Int = 0,

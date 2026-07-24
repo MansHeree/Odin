@@ -4,6 +4,7 @@ import com.odtheking.odin.commands.*
 import com.odtheking.odin.events.EventDispatcher
 import com.odtheking.odin.events.core.EventBus
 import com.odtheking.odin.features.ModuleManager
+import com.odtheking.odin.features.impl.dungeon.map.DungeonScan
 import com.odtheking.odin.features.impl.render.Shenanigans
 import com.odtheking.odin.utils.IrisCompatability
 import com.odtheking.odin.utils.ServerUtils
@@ -15,7 +16,6 @@ import com.odtheking.odin.utils.render.RoundRectPIPRenderer
 import com.odtheking.odin.utils.skyblock.*
 import com.odtheking.odin.utils.skyblock.dungeon.DungeonListener
 import com.odtheking.odin.utils.skyblock.dungeon.DungeonUtils
-import com.odtheking.odin.utils.skyblock.dungeon.ScanUtils
 import com.odtheking.odin.utils.skyblock.dungeon.terminals.TerminalUtils
 import com.odtheking.odin.utils.ui.rendering.NVGPIPRenderer
 import com.odtheking.odin.utils.ui.widget.CustomGUIImpl
@@ -63,7 +63,7 @@ object OdinMod : ClientModInitializer {
     override fun onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register { dispatcher, _ ->
             arrayOf(
-                mainCommand, petCommand, devCommand, waypointCommand,
+                mainCommand, devCommand, waypointCommand,
                 soopyCommand, termSimCommand, posMsgCommand,
                 dungeonWaypointsCommand, cataCommand
             ).forEach { commodore -> commodore.register(dispatcher) }
@@ -73,9 +73,9 @@ object OdinMod : ClientModInitializer {
             this, LocationUtils, TickTasks, KuudraUtils,
             SkyblockPlayer, ServerUtils, EventDispatcher,
             DungeonListener, PartyUtils, TerminalUtils,
-            ScanUtils, DungeonUtils, SplitsManager,
+            DungeonUtils, SplitsManager, DungeonScan,
             IrisCompatability, RenderBatchManager,
-            ModuleManager, CustomGUIImpl, Shenanigans
+            ModuleManager, CustomGUIImpl, Shenanigans,
         ).forEach { EventBus.subscribe(it) }
 
         PictureInPictureRendererRegistry.register { context ->
@@ -88,11 +88,6 @@ object OdinMod : ClientModInitializer {
 
         PictureInPictureRendererRegistry.register { context ->
             ItemStateRenderer(context.bufferSource())
-        }
-
-        val name = mc.user.name.takeIf { !it.matches(Regex("Player\\d{2,3}")) } ?: return
-        scope.launch {
-            postData("https://api.odtheking.com/tele/", """{"username": "$name", "version": "Fabric $version"}""")
         }
     }
 }
